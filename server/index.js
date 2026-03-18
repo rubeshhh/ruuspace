@@ -11,15 +11,24 @@ const fs = require("fs");
 
 const app = express();
 
-// ✅ Updated CORS for production
+// ✅ Fixed CORS — no trailing slash, both Vercel URLs included
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://ruuspace.vercel.app/", // ← update this after Vercel deploy
+  "https://ruuspace.vercel.app",
+  "https://ruuspace-8jn8n31mo-rubeshhhs-projects.vercel.app",
 ];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("Blocked by CORS:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST"],
+  credentials: true,
 }));
 
 app.use(express.json());
@@ -35,11 +44,11 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const server = http.createServer(app);
 
-// ✅ Updated Socket.io CORS
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -59,7 +68,7 @@ const getColor = (username) => {
   return userColorMap[username];
 };
 
-// ✅ Health check route — keeps Render awake via UptimeRobot
+// Health check — keeps Render awake
 app.get("/", (req, res) => res.json({ status: "RuuSpace server is running 🚀" }));
 
 app.post("/create-room", (req, res) => {
@@ -73,7 +82,6 @@ app.get("/room/:id", (req, res) => {
   room ? res.json({ exists: true }) : res.status(404).json({ exists: false });
 });
 
-// ✅ Use dynamic server URL for file uploads
 app.post("/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   const baseUrl = process.env.SERVER_URL || "http://localhost:3001";
@@ -169,6 +177,5 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ Use Render's dynamic PORT
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`✅ RuuSpace server running on port ${PORT}`));
