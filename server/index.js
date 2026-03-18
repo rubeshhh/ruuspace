@@ -14,7 +14,7 @@ const app = express();
 // ✅ Updated CORS for production
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://ruuspace-server.onrender.com", // ← update this after Vercel deploy
+  "https://ruuspace.vercel.app/", // ← update this after Vercel deploy
 ];
 
 app.use(cors({
