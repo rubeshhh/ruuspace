@@ -10,7 +10,18 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
-app.use(cors());
+
+// ✅ Updated CORS for production
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://ruuspace-server.onrender.com", // ← update this after Vercel deploy
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ["GET", "POST"],
+}));
+
 app.use(express.json());
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -23,8 +34,13 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const server = http.createServer(app);
+
+// ✅ Updated Socket.io CORS
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] },
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+  },
 });
 
 const rooms = {};
@@ -43,6 +59,9 @@ const getColor = (username) => {
   return userColorMap[username];
 };
 
+// ✅ Health check route — keeps Render awake via UptimeRobot
+app.get("/", (req, res) => res.json({ status: "RuuSpace server is running 🚀" }));
+
 app.post("/create-room", (req, res) => {
   const roomId = nanoid(6).toUpperCase();
   rooms[roomId] = { messages: [], users: [] };
@@ -54,9 +73,11 @@ app.get("/room/:id", (req, res) => {
   room ? res.json({ exists: true }) : res.status(404).json({ exists: false });
 });
 
+// ✅ Use dynamic server URL for file uploads
 app.post("/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
-  const url = `http://localhost:3001/uploads/${req.file.filename}`;
+  const baseUrl = process.env.SERVER_URL || "http://localhost:3001";
+  const url = `${baseUrl}/uploads/${req.file.filename}`;
   const isImage = req.file.mimetype.startsWith("image/");
   res.json({ url, name: req.file.originalname, isImage });
 });
@@ -118,7 +139,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("message-reacted", { msgId, reactions: msg.reactions });
   });
 
-  // ✅ INSIDE the connection block
   socket.on("delete-message", ({ roomId, msgId, username }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -130,7 +150,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("message-deleted", { msgId });
   });
 
-  // ✅ INSIDE the connection block
   socket.on("edit-message", ({ roomId, msgId, username, newMessage }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -148,7 +167,8 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("user-left", { username, users: rooms[roomId].users });
     }
   });
+});
 
-}); // ← io.on("connection") closes here
-
-server.listen(3001, () => console.log("✅ Server running on http://localhost:3001"));
+// ✅ Use Render's dynamic PORT
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => console.log(`✅ RuuSpace server running on port ${PORT}`));
