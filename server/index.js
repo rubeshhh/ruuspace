@@ -11,26 +11,8 @@ const fs = require("fs");
 
 const app = express();
 
-// ✅ Fixed CORS — no trailing slash, both Vercel URLs included
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://ruuspace.vercel.app",
-  "https://ruuspace-8jn8n31mo-rubeshhhs-projects.vercel.app",
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("Blocked by CORS:", origin);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  methods: ["GET", "POST"],
-  credentials: true,
-}));
-
+// ✅ Allow all origins — fixes CORS completely
+app.use(cors());
 app.use(express.json());
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -44,11 +26,11 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const server = http.createServer(app);
 
+// ✅ Allow all origins for Socket.io too
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: "*",
     methods: ["GET", "POST"],
-    credentials: true,
   },
 });
 
